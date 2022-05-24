@@ -9,6 +9,35 @@ This plugin allows decoding SENT frames of up to 6 data nibbles and allows expor
 - SPC support
 - Aggregation of individual nibble data into into FC1/FC2 data --> Loads of different configurations, could get complex
 
+## Developing:
+
+This plugin has been setup to use vscode as it's main code editor/ide.
+
+The current vscode setup looks for the Saleae Logic Analyzer SDK to be cloned into the `_sdk` folder in the project repository, which can be done by running the following:
+```
+git clone https://github.com/saleae/AnalyzerSDK ./_sdk
+```
+
+This repository also has a vscode configuration for debugging the logic plugin in-editor.
+
+The *Command Variable* extension is used for the debugging configuration in order to automatically find and attach to the appropriate Logic 2 process. The extension can be installed through the extension marketplace, or from the following vscode command:
+```
+ext install rioj7.command-variable
+```
+
+In order to use the vscode configuration to debug the plugin, you must ensure that:
+- The analyzer plugin's cmake build files were generated with the `-DCMAKE_BUILD_TYPE=Debug` flag.
+  - Ubuntu example:
+    ```
+    mkdir build
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=Debug ..
+    cmake --build .
+    ```
+- Logic 2's "Custom Low Level Analyzers" preference must be configured to be the directory of the built analyzer plugin.
+
+Then, the plugin can be debugged by launching Logic 2, and running the "Attach to dynamic Logic PID" debugging configuration.
+
 ## Building the plugin:
 
 If you're just here to grab the latest copy of the analyzer, the easiest option would be to grab the build artifacts from
