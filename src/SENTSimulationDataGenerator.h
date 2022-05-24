@@ -21,8 +21,11 @@ protected:
 protected:
 	void CreateSerialByte();
 	void AddNibble(U16 number_of_ticks, U16 samples_per_tick);
+	void AddSPCTrigger(U16 number_of_low_ticks, U16 samples_per_tick);
 
 	SimulationChannelDescriptor mSerialSimulationData;
+
+	U8 mSPCDevice;
 
 };
 #endif //SENT_SIMULATION_DATA_GENERATOR

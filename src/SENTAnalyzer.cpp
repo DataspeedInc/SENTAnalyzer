@@ -2,8 +2,9 @@
 #include "SENTAnalyzerSettings.h"
 #include <AnalyzerChannelData.h>
 #include <math.h>
+#include <sstream>
 
-#define STATUS_NIBBLE_NUMBER 	(1)
+#define STATUS_NIBBLE_NUMBER 	( (mSettings->spc) ? 2 : 1 )
 #define PAUSE_PULSE_NUMBER 		(crc_nibble_number + 1)
 
 SENTAnalyzer::SENTAnalyzer()
@@ -14,6 +15,7 @@ SENTAnalyzer::SENTAnalyzer()
 	framelist(),
 	corrected_samples_per_tick(0)
 {
+	UseFrameV2();
 	SetAnalyzerSettings( mSettings.get() );
 }
 
@@ -47,9 +49,12 @@ U8 SENTAnalyzer::CalculateCRC()
 	U8 crc4_table [16] = {0, 13, 7, 10, 14, 3, 9, 4, 1, 12, 6, 11, 15, 2, 8, 5};
 	U8 CheckSum16 = 5;
 
-	/* We increment the start pointer by 2 to skip sync and status nibbles.
+	/* We increment the start pointer to skip sync, status, and master trigger nibbles.
 	 * In the end condition we decrement the end pointer by 1 to omit the CRC nibble */
-	for(std::vector<Frame>::iterator it = framelist.begin() + 2; it != framelist.end() - (number_of_nibbles - crc_nibble_number); it++)
+
+	/* Skip the first 2 nibbles if there's only sync and status, skip 3 if there's also a master trigger pulse. */
+	U8 skip = (mSettings->spc) ? 3 : 2;
+	for(std::vector<Frame>::iterator it = framelist.begin() + skip; it != framelist.end() - ((mSettings->pausePulseEnabled) ? 2 : 1)/*(number_of_nibbles - crc_nibble_number)*/; it++)
 	{
 		CheckSum16 = it->mData1 ^ crc4_table[CheckSum16];
 	}
@@ -77,21 +82,76 @@ void SENTAnalyzer::addSENTPulse(U16 data, enum SENTNibbleType type, U64 start, U
 	framelist.push_back(frame);
 }
 
-void SENTAnalyzer::addErrorFrame(U16 data, U64 start, U64 end, SENTErrorType error_type)
+void SENTAnalyzer::addErrorFrame(U16 data1, U16 data2, U64 start, U64 end, SENTErrorType error_type)
 {
 	Frame frame;
-	frame.mData1 = data;
+	frame.mData1 = data1;
+	frame.mData2 = data2;
 	frame.mFlags = DISPLAY_AS_ERROR_FLAG | (1 << error_type);
 	frame.mType = Error;
 	frame.mStartingSampleInclusive = start;
 	frame.mEndingSampleInclusive = end;
 
 	mResults->AddFrame(frame);
+	this->addFrameV2(frame);
 	mResults->CommitResults();
 	ReportProgress(frame.mEndingSampleInclusive);
 }
 
-/** Callback function for detection of sync pulse
+void SENTAnalyzer::addFrameV2(Frame &frame)
+{
+	FrameV2 framev2;
+
+	std::string typeName;
+
+	switch( frame.mType )
+	{
+		case SENTNibbleType::TriggerPulse:
+			framev2.AddInteger("data", frame.mData1);
+			typeName = "mtp";
+			break;
+		case SENTNibbleType::SyncPulse:
+			framev2.AddInteger("data", frame.mData1);
+			typeName = "sync";
+			break;
+		case SENTNibbleType::StatusNibble:
+			framev2.AddByte("data", frame.mData1);
+			typeName = "status";
+			break;
+		case SENTNibbleType::FCNibble:
+			framev2.AddByte("data", frame.mData1);
+			typeName = "fc";
+			break;
+		case SENTNibbleType::CRCNibble:
+			framev2.AddByte("data", frame.mData1);
+			typeName = "crc";
+			break;
+		case SENTNibbleType::PausePulse:
+			framev2.AddInteger("data", frame.mData1);
+			typeName = "pause";
+			break;
+		case SENTNibbleType::Unknown:
+			framev2.AddByte("data", frame.mData1);
+			typeName = "unknown";
+			break;
+		case SENTNibbleType::Error:
+			if((frame.mFlags & (1 << NibbleNumberError)) != 0u) {
+				std::stringstream errorStr;
+				errorStr << "Nibbles detected: " << frame.mData1;
+				framev2.AddString("error", errorStr.str().c_str());
+			} else if((frame.mFlags & (1 << CrcError)) != 0u) {
+				std::stringstream errorStr;
+				errorStr << "Read CRC: " << frame.mData1 << " Calculated CRC: " << frame.mData2;
+				framev2.AddString("error", errorStr.str().c_str());
+			}
+			typeName = "error";
+			break;
+	}
+	
+	mResults->AddFrameV2(framev2, typeName.c_str(), frame.mStartingSampleInclusive, frame.mEndingSampleInclusive);
+}
+
+/** Callback function for detection of frame beginning pulse (SPC trigger or sync.)
  *
  *  This function will do some sanity checks on the data gathered during the
  *  last SENT frame. It will check
@@ -101,17 +161,19 @@ void SENTAnalyzer::addErrorFrame(U16 data, U64 start, U64 end, SENTErrorType err
  *
  *  If any of these checks fail, the SENT frame is dropped.
  */
-void SENTAnalyzer::syncPulseDetected()
+void SENTAnalyzer::beginPulseDetected()
 {
-	if(framelist.size() == number_of_nibbles)
+	if( framelist.size() == number_of_nibbles )
 	{
-		U8 expected_crc = CalculateCRC();
-		bool crc_correct = (framelist.at(crc_nibble_number).mData1 == expected_crc);
+		U8 calculated_crc = CalculateCRC();
+		U8 read_crc = framelist.at(crc_nibble_number).mData1;
+		bool crc_correct = read_crc == calculated_crc;
 		for(std::vector<Frame>::iterator it = framelist.begin(); it != framelist.end(); it++) {
 			if(!crc_correct && (it->mType == CRCNibble)) {
-				addErrorFrame(expected_crc, it->mStartingSampleInclusive, it->mEndingSampleInclusive, CrcError);
+				addErrorFrame(read_crc, calculated_crc, it->mStartingSampleInclusive, it->mEndingSampleInclusive, CrcError);
 			} else {
 				mResults->AddFrame( *it );
+				this->addFrameV2( *it );
 				mResults->CommitResults();
 				ReportProgress( it->mEndingSampleInclusive );
 			}
@@ -120,7 +182,7 @@ void SENTAnalyzer::syncPulseDetected()
 	}
 	else if( framelist.size() > 0 )
 	{
-		addErrorFrame(framelist.size(), framelist.begin()->mStartingSampleInclusive, framelist.begin()->mEndingSampleInclusive, NibbleNumberError);
+		addErrorFrame(framelist.size(), 0, framelist.begin()->mStartingSampleInclusive, framelist.begin()->mEndingSampleInclusive, NibbleNumberError);
 		mResults->CommitPacketAndStartNewPacket();
 	}
 	else /* Framelist is empty. This occurs when the first pulse is already a sync pulse */
@@ -193,7 +255,7 @@ void SENTAnalyzer::WorkerThread()
 	mSampleRateHz = GetSampleRate();
 
 	/* Based on the configured tick time and the sampling rate, determine the amount of samples per tick */
-	U32 theoretical_samples_per_ticks = mSampleRateHz * (mSettings->tick_time_half_us / 2.0) / 1000000;
+	U32 theoretical_samples_per_ticks = (mSampleRateHz * mSettings->tick_time_us) / 1000000;
 
 	/* This is initialized to the theoretical samples per tick, and is adjusted on every
 	 * received sync pulse */
@@ -207,8 +269,6 @@ void SENTAnalyzer::WorkerThread()
 		mSerial->AdvanceToNextEdge();
 	mSerial->AdvanceToNextEdge();
 
-	U64 starting_sample;
-
 	framelist = std::vector<Frame>();
 	nibble_counter = 0;
 
@@ -217,9 +277,12 @@ void SENTAnalyzer::WorkerThread()
 		enum SENTNibbleType nibble_type = Unknown;
 
 		/* We capture the sample number on the falling edge, for reference */
-		starting_sample = mSerial->GetSampleNumber();
-		/* Then, we advance 2 edges, so we end up on the next falling edge */
+		U64 starting_sample = mSerial->GetSampleNumber();
+		/* Then, we advance to the rising edge */
 		mSerial->AdvanceToNextEdge();
+		/* Capture the sample of the rising edge in this period */
+		U64 rising_sample = mSerial->GetSampleNumber();
+		/* Advance to the next falling edge, and the end of the period. */
 		mSerial->AdvanceToNextEdge();
 
 		/* Calculate the number of samples in this period */
@@ -229,22 +292,36 @@ void SENTAnalyzer::WorkerThread()
 		U16 theoretical_number_of_ticks = round((float)number_of_samples / theoretical_samples_per_ticks);
 		U16 corrected_number_of_ticks = round((float)number_of_samples / corrected_samples_per_tick);
 
+		/* Calculate the amount of ticks while the period was low, in the case that the period is an SPC trigger. */
+		U16 low_period_number_of_ticks = round((float)(rising_sample - starting_sample) / corrected_samples_per_tick);
+
 		/* Based on the amount of ticks and a nibble counter, we can attempt to determine
    		   what type of pulse was encountered */
 
+		if ((mSettings->spc) && (nibble_counter == PAUSE_PULSE_NUMBER + 1))
+		{
+			nibble_type = SENTNibbleType::TriggerPulse;
+			nibble_counter = 0;
+			beginPulseDetected();
+			// Assign the low period number of ticks for the MTP data readout.
+			corrected_number_of_ticks = low_period_number_of_ticks;
+		}
 		/* First check if the detected pulse is a sync pulse
 		   As a sync pulse indicates the start of a new SENT frame, the previous
 		   Packet is closed and committed and a new Packet is started.
 		   */
-		if(isPulseSyncPulse(theoretical_number_of_ticks))
+		else if(isPulseSyncPulse(theoretical_number_of_ticks))
 		{
 			/* If it's a valid sync pulse, calculate the corrected tick time */
 			correctTickTime(number_of_samples);
 			/* Then close the previous frame and check if it was valid */
-			syncPulseDetected();
+			
+			/* If SPC isn't enabled, then this is the beginning pulse of the frame */
+			if (!mSettings->spc)
+				beginPulseDetected();
 			nibble_type = SyncPulse;
 			corrected_number_of_ticks = 56;
-			nibble_counter = 0;
+			nibble_counter = (mSettings->spc) ? 1 : 0;
 		}
 		/* Then we check if the nibble counter indicates that we're expecting a pause pulse.
 		   The pause pulse can take a larger range of sizes than any of the other pulse types,
@@ -307,7 +384,7 @@ U32 SENTAnalyzer::GenerateSimulationData( U64 minimum_sample_index, U32 device_s
 
 U32 SENTAnalyzer::GetMinimumSampleRateHz()
 {
-	return 2000000 / (mSettings->tick_time_half_us / 2.0);
+	return 2000000 / mSettings->tick_time_us;
 }
 
 const char* SENTAnalyzer::GetAnalyzerName() const

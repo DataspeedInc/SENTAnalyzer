@@ -1,0 +1,76 @@
+version: 2.1
+orbs: 
+  win: circleci/windows@4.1.1
+jobs:
+
+  build_ubuntu:
+    docker:
+      - image: cimg/base:stable
+    resource_class: medium
+    steps:
+      # Perform neccessary git safe.directory modification to 
+      # allow local CircleCI builds to work.
+      - run:
+          command: |
+            if [[ ${CIRCLE_SHELL_ENV} =~ "localbuild" ]]; then
+              git config --global --add safe.directory /tmp/_circleci_local_build_repo
+            fi
+      # Checkout repo to container.
+      - checkout
+      # Install dependencies.
+      - run: sudo apt-get install build-essential cmake
+      # Build
+      - run: 
+          command: |
+            mkdir _build
+            cd _build
+            cmake ..
+            cmake --build .
+      # Persist build to workspace
+      - persist_to_workspace:
+          root: _build/Analyzers
+          paths:
+            - libSENT_analyzer.so
+
+  build_windows:
+    executor:
+      name: win/server-2022
+      size: "medium"
+    steps:
+      - checkout
+      - run: choco install cmake -y --installargs 'ADD_CMAKE_TO_PATH=System'
+      - run: 
+          command: refreshenv && mkdir _build && cd _build && cmake ..
+          shell: cmd.exe 
+      - run: msbuild _build\SENT_analyzer.sln /t:SENT_analyzer /p:Configuration="Release" /p:Platform="x64" /p:BuildProjectReferences=false 
+      - run: cd _build; dir
+      - persist_to_workspace:
+          root: _build/Analyzers/Release
+          paths:
+            - SENT_analyzer.dll
+
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    resource_class: small
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: wget https://github.com/tcnksm/ghr/releases/download/v0.14.0/ghr_v0.14.0_linux_amd64.tar.gz
+      - run: tar -xf ghr_v0.14.0_linux_amd64.tar.gz
+      - run:
+          command: |
+            cd ghr_v0.14.0_linux_amd64
+            releasetag=$(TZ=America/Detroit date '+%m-%d-%y_%H%M')
+            ./ghr -u DataspeedInc -r SENTAnalyzer -t $GITHUB_API_KEY -name "Release from $releasetag" $releasetag /tmp/workspace
+
+workflows:
+  version: 2
+  build_deploy:
+    jobs:
+      - build_ubuntu
+      - build_windows
+      - deploy:
+          requires:
+            - build_ubuntu
+            - build_windows

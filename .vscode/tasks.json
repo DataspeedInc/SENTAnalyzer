@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "store_logic_debug_pid",
+            "command": "${workspaceRoot}/debug/store_logic_debug_pid.sh",
+            "args": [],
+            "type": "shell"
+        }
+    ]
+}

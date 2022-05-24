@@ -17,17 +17,19 @@ public:
 
 
 	Channel mInputChannel;
-	U32 tick_time_half_us;
+	double tick_time_us;
 	bool pausePulseEnabled;
 	U32 numberOfDataNibbles;
+	bool spc;
 	bool legacyCRC;
 
 protected:
-	std::auto_ptr< AnalyzerSettingInterfaceChannel >	mInputChannelInterface;
-	std::auto_ptr< AnalyzerSettingInterfaceInteger >	tickTimeInterface;
-	std::auto_ptr< AnalyzerSettingInterfaceBool >		pausePulseInterface;
-	std::auto_ptr< AnalyzerSettingInterfaceInteger >	dataNibblesInterface;
-	std::auto_ptr< AnalyzerSettingInterfaceBool >		legacyCRCInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceChannel >	mInputChannelInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceText >   	tickTimeInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >		pausePulseInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceInteger >	dataNibblesInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >		spcInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >		legacyCRCInterface;
 };
 
 #endif //SENT_ANALYZER_SETTINGS

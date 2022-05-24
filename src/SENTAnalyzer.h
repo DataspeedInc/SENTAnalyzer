@@ -1,6 +1,8 @@
 #ifndef SENT_ANALYZER_H
 #define SENT_ANALYZER_H
 
+#define LOGIC2
+
 #include <Analyzer.h>
 #include "SENTAnalyzerResults.h"
 #include "SENTSimulationDataGenerator.h"
@@ -22,8 +24,8 @@ public:
 	virtual bool NeedsRerun();
 
 protected: //vars
-	std::auto_ptr< SENTAnalyzerSettings > mSettings;
-	std::auto_ptr< SENTAnalyzerResults > mResults;
+	std::unique_ptr< SENTAnalyzerSettings > mSettings;
+	std::unique_ptr< SENTAnalyzerResults > mResults;
 	AnalyzerChannelData* mSerial;
 
 	SENTSimulationDataGenerator mSimulationDataGenerator;
@@ -39,13 +41,14 @@ protected: //vars
 	std::vector<Frame> framelist;
 	U32 corrected_samples_per_tick;
 
-	void syncPulseDetected();
+	void beginPulseDetected();
 	void correctTickTime(U32 number_of_samples);
 	U8 CalculateCRC();
 	bool isPulseSyncPulse(U16 number_of_ticks);
 private:
 	void addSENTPulse(U16 ticks, enum SENTNibbleType type, U64 start, U64 end);
-	void addErrorFrame(U16 data, U64 start, U64 end, SENTErrorType error_type);
+	void addErrorFrame(U16 data1, U16 data2, U64 start, U64 end, SENTErrorType error_type);
+	void addFrameV2(Frame &frame);
 };
 
 extern "C" ANALYZER_EXPORT const char* __cdecl GetAnalyzerName();

@@ -1,0 +1,40 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "attach",
+            "name": "Attach to /tmp/ Logic PID",
+            "target": "${input:logicPID}",
+            "cwd": "${workspaceRoot}",
+            "valuesFormatting": "parseText",
+            "setupCommands": [
+                {
+                    "description": "Enable auto shared lirary symbol loading",
+                    "text": "set auto-solib-add on"
+                }
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Attach to dynamic Logic PID",
+            "configurations": ["Attach to /tmp/ Logic PID"],
+            "preLaunchTask": "store_logic_debug_pid",
+            "stopAll": true
+        }
+    ],
+    "inputs": [
+        {
+            "id": "logicPID",
+            "type": "command",
+            "command": "extension.commandvariable.file.content",
+            "args": {
+              "fileName": "/tmp/logic_debug_pid"
+            }
+          }
+    ]
+}

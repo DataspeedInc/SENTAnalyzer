@@ -39,24 +39,28 @@ std::string SENTAnalyzerResults::FrameToString(Frame frame, DisplayBase display_
 	char number_str[128];
 	switch( frame.mType )
 	{
+		case TriggerPulse:
+			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
+			ss << "MTP: " << number_str;
+			break;
 		case SyncPulse:
-			ss << "Sync pulse: ";
+			ss << "Sync";
 			break;
 		case StatusNibble:
 			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
-			ss << "Status nibble: " << number_str;
+			ss << "Status: " << number_str;
 			break;
 		case FCNibble:
 			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
-			ss << "Fast channel data: " << number_str;
+			ss << "FC: " << number_str;
 			break;
 		case CRCNibble:
 			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
-			ss << "CRC data: " << number_str;
+			ss << "CRC: " << number_str;
 			break;
 		case PausePulse:
 			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
-			ss << "Pause pulse length: " << number_str;
+			ss << "Pause: " << number_str;
 			break;
 		case Unknown:
 			ss << "Unknown";
@@ -68,7 +72,7 @@ std::string SENTAnalyzerResults::FrameToString(Frame frame, DisplayBase display_
 				ss << "Error. Number of nibbles detected: " << number_str;
 			} else if((frame.mFlags & (1 << CrcError)) != 0u){
 				AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
-				ss << "Error. Wrong CRC: expected: " << number_str;
+				ss << "Error. Wrong CRC- calculated: " << number_str;
 			}
 			break;
 		}
@@ -139,7 +143,6 @@ void SENTAnalyzerResults::GenerateFrameTabularText( U64 frame_index, DisplayBase
 void SENTAnalyzerResults::GeneratePacketTabularText( U64 packet_id, DisplayBase display_base )
 {
 	//not supported
-
 }
 
 void SENTAnalyzerResults::GenerateTransactionTabularText( U64 transaction_id, DisplayBase display_base )
