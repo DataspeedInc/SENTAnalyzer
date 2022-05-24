@@ -68,9 +68,23 @@ workflows:
   version: 2
   build_deploy:
     jobs:
-      - build_ubuntu
-      - build_windows
+      - build_ubuntu:
+          filters:
+            branches:
+              only:
+                - master
+                - release
+      - build_windows:
+          filters:
+            branches:
+              only:
+                - master
+                - release
       - deploy:
           requires:
             - build_ubuntu
             - build_windows
+          filters:
+            branches:
+              only:
+                - master
