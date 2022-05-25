@@ -52,7 +52,7 @@ std::string SENTAnalyzerResults::FrameToString(Frame frame, DisplayBase display_
 			break;
 		case FCNibble:
 			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
-			ss << "FC: " << number_str;
+			ss << "FC Data: " << number_str;
 			break;
 		case CRCNibble:
 			AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 4, number_str, 128 );
