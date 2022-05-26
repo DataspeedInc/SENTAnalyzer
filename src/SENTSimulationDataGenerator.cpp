@@ -5,6 +5,23 @@
 
 const int fc_data [6] = {7, 4, 8, 7, 4, 8};
 const int device_ticks [4] = {11, 21, 38, 65};
+const char status_nibbles [16] = {
+	0x8,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0};
 
 SENTSimulationDataGenerator::SENTSimulationDataGenerator()
 {
@@ -73,7 +90,9 @@ void SENTSimulationDataGenerator::CreateSerialByte()
 		/* Calibration pulse */
 		AddNibble(56, samples_per_tick);
 		/* Status nibble */
-		AddNibble(12, samples_per_tick);
+		AddNibble(12 + status_nibbles[mStatus], samples_per_tick);
+		mStatus = (mStatus + 1) % 16;
+
 		/* Fast channel nibbles */
 		for (U8 counter = 0; counter < mSettings->numberOfDataNibbles; counter++) {
 			AddNibble(fc_data[counter] + 12, samples_per_tick);
@@ -94,7 +113,8 @@ void SENTSimulationDataGenerator::CreateSerialByte()
 		/* Calibration pulse */
 		AddNibble(56, samples_per_tick);
 		/* Status nibble */
-		AddNibble(12, samples_per_tick);
+		AddNibble(12 + status_nibbles[mStatus], samples_per_tick);
+		mStatus = (mStatus + 1) % 16;
 		/* Fast channel nibbles */
 		for (U8 counter = 0; counter < mSettings->numberOfDataNibbles; counter++) {
 			AddNibble(fc_data[counter] + 12, samples_per_tick);
