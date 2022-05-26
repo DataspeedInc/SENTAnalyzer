@@ -1,0 +1,13 @@
+{
+  "name": "SENT (J2716) HLA",
+  "apiVersion": "1.1.0",
+  "author": "Dataspeed Inc.",
+  "version": "0.0.1",
+  "description": "Provides high-level analysis of SENT message frames, including SPC device requests.",
+  "extensions": {
+    "SENT (J2716) HLA": {
+      "type": "HighLevelAnalyzer",
+      "entryPoint": "HighLevelAnalyzer.Hla"
+    }
+  }
+}
