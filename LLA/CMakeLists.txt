@@ -17,4 +17,19 @@ src/SENTSimulationDataGenerator.cpp
 src/SENTSimulationDataGenerator.h
 )
 
+# if(GENERATION_TOOLS MATCHES "True")
+#     add_definitions(-DGENERATION_TOOLS)
+# else()
+#     remove_definitions(-DGENERATION_TOOLS)
+# endif()
+
+if(GENERATION_TOOLS STREQUAL "True")
+    set(GENERATION_TOOLS False)
+    message(STATUS "-- Compiling with Generation Tools! --")
+    add_definitions(-DGENERATION_TOOLS)
+else()
+    message(STATUS "-- Compiling without Generation Tools! --")
+    remove_definitions(-DGENERATION_TOOLS)
+endif()
+
 add_analyzer_plugin(SENT_analyzer SOURCES ${SOURCES})
