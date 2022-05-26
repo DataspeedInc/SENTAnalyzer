@@ -3,12 +3,14 @@
 
 from saleae.analyzers import HighLevelAnalyzer, AnalyzerFrame, StringSetting, NumberSetting, ChoicesSetting
 
+import math
+
 # High level analyzers must subclass the HighLevelAnalyzer class.
 class Hla(HighLevelAnalyzer):
     ### Settings ###
     attempt_fc_parsing = ChoicesSetting(choices=('Yes', 'No'))
     display = ChoicesSetting(choices=('Fast Channel Data', 'Slow Channel Data'))
-    short_channel_format = ChoicesSetting(choices=('Short', 'Enhanced'))
+    slow_channel_format = ChoicesSetting(choices=('Short', 'Enhanced'))
 
     ### Instance Variables ###
     frame_buffer = []
@@ -41,8 +43,26 @@ class Hla(HighLevelAnalyzer):
         '''
 
         def end_sc():
+            fb = self.frame_buffer
+            sb = self.sc_buffer
 
-            pass
+            toRet = None
+
+            # If reading a short format.
+            if self.slow_channel_format == "Short":
+                toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
+                    'status': 'endd'
+                    })
+            # If reading an enhanced format.
+            else:
+                # Extract the last 18 elements from the slow-channel buffer.
+                slow_frame = sb[-18:]
+
+                print(f"Extracted enhanced frame: {slow_frame}")
+
+            sb.clear()
+            
+            return toRet
 
         def end_frame():
             # If the previous frame doesn't contain a passed crc check, return.
@@ -53,6 +73,7 @@ class Hla(HighLevelAnalyzer):
             toRet = None
 
             fb = self.frame_buffer
+            sb = self.sc_buffer
 
             ### Extract the frame's data and status information. ###
 
@@ -72,13 +93,32 @@ class Hla(HighLevelAnalyzer):
             sc_output_frame = None
 
             # If we're attempting to parse a short message format for the slow channel.
-            if self.short_channel_format == "Short":
+            if self.slow_channel_format == 'Short':
                 # If the beginning of a short channel frame is detected.
                 if (status >> 3) & 0x1:
                     sc_output_frame = end_sc()
             # If we're attempting to parse an enhanced message format for the slow channel.
             else:
-                pass 
+                checks = ( len(sb) - 18 ) + 1
+
+                if checks > 0:                
+                    status_bits = 0
+                    
+                    # Convert our status buffer's current bit 3s into an integer for bitwise comparisons.
+                    for i in sb:
+                        status_bits <<= 1
+                        status_bits |= ( (i >> 3) & 0x1 )
+
+                    # Get the amount of bits needed to represent status_bits
+                    status_bits_len = math.floor(math.log2(status_bits)) + 1
+
+                    # Iterate through our status bits and check if there's a pattern indicating
+                    # a finished enhanced frame.
+                    pattern = 0b111111100000100001
+                    match =   0b111111000000000000
+
+                    if (status_bits & pattern) == match:
+                        sc_output_frame = end_sc()
 
             ### Specify which AnalyzerFrame to return ###
 
