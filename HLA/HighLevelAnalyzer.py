@@ -3,6 +3,8 @@
 
 from saleae.analyzers import HighLevelAnalyzer, AnalyzerFrame, StringSetting, NumberSetting, ChoicesSetting
 
+import CRC
+
 import math
 
 # High level analyzers must subclass the HighLevelAnalyzer class.
@@ -35,6 +37,22 @@ class Hla(HighLevelAnalyzer):
         Settings can be accessed using the same name used above.
         '''
 
+    def ints_bit_serialize(self, ints_list: list, n: int):
+        '''
+        Convert a list of integers (or numerical types) into a single integer by 
+        taking the nth bit of every int in the list and recombining them into a single int type.
+        
+        (Note: n begins at 0, so a n of 0 would be the least significant bit.)
+        '''
+        
+        toRet = 0
+
+        for i in ints_list:
+            toRet <<= 1
+            toRet |= ( (i >> n) & 0x1 )
+
+        return toRet
+
     def decode(self, frame: AnalyzerFrame):
         '''
         Process a frame from the input analyzer, and optionally return a single `AnalyzerFrame` or a list of `AnalyzerFrame`s.
@@ -58,10 +76,41 @@ class Hla(HighLevelAnalyzer):
                 # Extract the last 18 elements from the slow-channel buffer.
                 slow_frame = sb[-18:]
 
-                print(f"Extracted enhanced frame: {slow_frame}")
+                ### Extract individual frame elements ###
+                bit3s = self.ints_bit_serialize(slow_frame, 3)
+                bit2s = self.ints_bit_serialize(slow_frame, 2)
+
+                # Convert data bits into a 24-bit integer for the CRC check.
+                combined_message = 0
+                
+                for i in range(12):
+                    combined_message <<= 1
+                    combined_message |= ( (bit2s >> 11 - i) & 0x1 )
+                    combined_message <<= 1
+                    combined_message |= ( (bit3s >> 11 - i) & 0x1 )
+
+                c           = (bit3s >> 10) & 0x1
+                b3_nibble_1 = (bit3s >> 6)  & 0xF
+                b3_nibble_2 = (bit3s >> 1)  & 0xF
+                crc         = (bit2s >> 12) & 0x3F
+                b2_data     = (bit2s)       & 0xFFF 
+
+                print(
+                    f"Extracted frame info:\n"
+                    f"C bit:\t\t{c}\n"
+                    f"b3_nibble_1:\t{'{0:04b}'.format(b3_nibble_1)}\n"
+                    f"b3_nibble_2:\t{'{0:04b}'.format(b3_nibble_2)}\n"
+                    f"crc:\t\t{'{0:06b}'.format(crc)}\n"
+                    f"computed crc:\t{'{0:06b}'.format(CRC.gen_crc_6(combined_message, 4))}\n"
+                    f"b2_data:\t{'{0:012b}'.format(b2_data)}\n"
+                    f"raw bit3s:\t{'{0:018b}'.format(bit3s)}\n"
+                    f"raw bit2s:\t{'{0:018b}'.format(bit2s)}\n"
+                    f"combined data:\t{'{0:024b}'.format(combined_message)}\n"
+                    f"----------------------------"
+                    )
 
             sb.clear()
-            
+
             return toRet
 
         def end_frame():
@@ -102,15 +151,7 @@ class Hla(HighLevelAnalyzer):
                 checks = ( len(sb) - 18 ) + 1
 
                 if checks > 0:                
-                    status_bits = 0
-                    
-                    # Convert our status buffer's current bit 3s into an integer for bitwise comparisons.
-                    for i in sb:
-                        status_bits <<= 1
-                        status_bits |= ( (i >> 3) & 0x1 )
-
-                    # Get the amount of bits needed to represent status_bits
-                    status_bits_len = math.floor(math.log2(status_bits)) + 1
+                    status_bits = self.ints_bit_serialize(sb, 3)
 
                     # Iterate through our status bits and check if there's a pattern indicating
                     # a finished enhanced frame.
