@@ -11,9 +11,17 @@ CRC_6 = [
     33, 56, 19, 10, 28, 5, 46, 55, 2, 27, 48, 41, 63, 38, 13, 20
 ]
 
-def gen_crc_4():
+def gen_crc_4(input: int, n: int, legacy: bool = False):
+    checksum_16 = 5
 
-    pass
+    for i in range(n):
+        nibble = __extract_nibble(input, 4, (n-1) - i)
+        checksum_16 = nibble ^ CRC_4[checksum_16]
+
+    if not legacy:
+        checksum_16 = 0 ^ CRC_4[checksum_16]
+
+    return checksum_16
 
 def gen_crc_6(input: int, n: int):
     checksum_64 = 21

@@ -1,6 +1,3 @@
-# High Level Analyzer
-# For more information and documentation, please go to https://support.saleae.com/extensions/high-level-analyzer-extensions
-
 from saleae.analyzers import HighLevelAnalyzer, AnalyzerFrame, StringSetting, NumberSetting, ChoicesSetting
 
 import CRC
@@ -68,9 +65,43 @@ class Hla(HighLevelAnalyzer):
 
             # If reading a short format.
             if self.slow_channel_format == "Short":
-                toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
-                    'status': 'endd'
-                    })
+                # toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
+                #     'status': 'endd'
+                #     })
+
+                # Extract the last 16 elements from the slow-channel buffer.
+                slow_frame = sb[-16:]
+
+                bit2s = self.ints_bit_serialize(slow_frame, 2)
+
+                crc_data   = (bit2s >> 4)  & 0xFFF
+                computed_crc = CRC.gen_crc_4(crc_data, 3)
+
+                message_id = (bit2s >> 12) & 0xF
+                data_byte  = (bit2s >> 4)  & 0xFF
+                crc        = (bit2s)       & 0xF
+
+                print(f"frame: {slow_frame}\n- - - -")
+
+                print(
+                    f"Extracted frame info:\n"
+                    f"message_id:\t{'{0:04b}'.format(message_id)}\n"
+                    f"data_byte:\t{'{0:08b}'.format(data_byte)}\n"
+                    f"crc:\t\t{'{0:04b}'.format(crc)}\n"
+                    f"computed crc:\t{'{0:04b}'.format(computed_crc)}\n"
+                    f"raw bit2s:\t{'{0:016b}'.format(bit2s)}\n"
+                    f"----------------------------"
+                    )
+
+                if crc != computed_crc:
+                    toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
+                        'status': 'CRC Error'
+                        })
+                else:
+                    toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
+                        'status': 'Valid Short Frame'
+                        })
+
             # If reading an enhanced format.
             else:
                 # Extract the last 18 elements from the slow-channel buffer.
@@ -89,6 +120,8 @@ class Hla(HighLevelAnalyzer):
                     combined_message <<= 1
                     combined_message |= ( (bit3s >> 11 - i) & 0x1 )
 
+                computed_crc = CRC.gen_crc_6(combined_message, 4)
+
                 c           = (bit3s >> 10) & 0x1
                 b3_nibble_1 = (bit3s >> 6)  & 0xF
                 b3_nibble_2 = (bit3s >> 1)  & 0xF
@@ -101,13 +134,22 @@ class Hla(HighLevelAnalyzer):
                     f"b3_nibble_1:\t{'{0:04b}'.format(b3_nibble_1)}\n"
                     f"b3_nibble_2:\t{'{0:04b}'.format(b3_nibble_2)}\n"
                     f"crc:\t\t{'{0:06b}'.format(crc)}\n"
-                    f"computed crc:\t{'{0:06b}'.format(CRC.gen_crc_6(combined_message, 4))}\n"
+                    f"computed crc:\t{'{0:06b}'.format(computed_crc)}\n"
                     f"b2_data:\t{'{0:012b}'.format(b2_data)}\n"
                     f"raw bit3s:\t{'{0:018b}'.format(bit3s)}\n"
                     f"raw bit2s:\t{'{0:018b}'.format(bit2s)}\n"
                     f"combined data:\t{'{0:024b}'.format(combined_message)}\n"
                     f"----------------------------"
                     )
+
+                if crc != computed_crc:
+                    toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
+                        'status': 'CRC Error'
+                        })
+                else:
+                    toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
+                        'status': 'Valid Enhanced Frame'
+                        })
 
             sb.clear()
 
