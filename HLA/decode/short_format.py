@@ -47,43 +47,43 @@ def decode(message_id: int, data: int):
 
     str = __message_to_string(mt, ec, data)
 
-    retval = [str, mt]
+    toRet = [str, mt]
 
     # If there were any error codes, append them as a tuple.
     if len(ec) > 0:
-        retval.append(tuple(ec))
+        toRet.append(tuple(ec))
     
-    return tuple(retval)
+    return tuple(toRet)
 
 def __message_to_string(mt: MessageTypes, ec: list, data: int):
 
-    retval = ""
+    toRet = ""
 
     if   mt == MessageTypes.AIR_TEMPERATURE_HIGH:
-        retval += "Air Temperature high-order byte"
+        toRet += "Air Temperature high-order byte"
     elif mt == MessageTypes.AIR_TEMPERATURE_LOW:
-        retval += "Air Temperature low-order byte"
+        toRet += "Air Temperature low-order byte"
     elif mt == MessageTypes.RELATIVE_HUMIDITY_HIGH:
-        retval += "Relative humidity high-order byte"
+        toRet += "Relative humidity high-order byte"
     elif mt == MessageTypes.RELATIVE_HUMIDITY_LOW:
-        retval += "Relative humidity low-order byte"
+        toRet += "Relative humidity low-order byte"
     elif mt == MessageTypes.BAROMETRIC_PRESSURE_HIGH:
-        retval += "Barometric pressure high-order byte"
+        toRet += "Barometric pressure high-order byte"
     elif mt == MessageTypes.BAROMETRIC_PRESSURE_LOW:
-        retval += "Barometric pressure low-order byte"
+        toRet += "Barometric pressure low-order byte"
     elif mt == MessageTypes.RESERVED:
-        retval += "Reserved message"
+        toRet += "Reserved message"
     elif mt == MessageTypes.ERROR_CODES:
-        retval += "Error codes"
+        toRet += "Error codes"
 
-    retval += ": "
+    toRet += ": "
 
     if mt != MessageTypes.ERROR_CODES:
-        retval += f"{'{0:08b}'.format(data)} - {data}"
+        toRet += f"{'{0:08b}'.format(data)} - {data}"
     else:
-        retval += str(ec)
+        toRet += str(ec)
 
-    return retval
+    return toRet
 
 def __bit_get(val: int, bit: int):
     return (val >> bit) & 0x1
