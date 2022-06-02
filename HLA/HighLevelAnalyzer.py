@@ -3,8 +3,10 @@ from saleae.analyzers import HighLevelAnalyzer, AnalyzerFrame, StringSetting, Nu
 import crc
 import decode.short_format as decode_short
 import decode.enhanced_format as decode_enhanced
+import decode.fc_data as decode_fc
 
 import math
+import copy
 
 # High level analyzers must subclass the HighLevelAnalyzer class.
 class Hla(HighLevelAnalyzer):
@@ -25,13 +27,13 @@ class Hla(HighLevelAnalyzer):
             'format': 'FC Data: {{data.fc_data}}'
         },
         'short_frame': {
-            'format': 'Short Frame: {{data.slow_frame}}'
+            'format': 'SF - {{data.slow_frame}}'
         },
         'enhanced_frame': {
-            'format': 'Enhanced Frame: {{data.slow_frame}}'
+            'format': 'EF - {{data.slow_frame}}'
         },
         'error': {
-            'format': 'Slow-frame Error: {{data.error}}'
+            'format': 'SC Frame Error: {{data.error}}'
         }
     }
 
@@ -42,7 +44,7 @@ class Hla(HighLevelAnalyzer):
         Settings can be accessed using the same name used above.
         '''
 
-    def ints_bit_serialize(self, ints_list: list, n: int):
+    def __ints_bit_serialize(self, ints_list: list, n: int):
         '''
         Convert a list of integers (or numerical types) into a single integer by 
         taking the nth bit of every int in the list and recombining them into a single int type.
@@ -81,21 +83,23 @@ class Hla(HighLevelAnalyzer):
         return toRet
 
     def end_sc(self):
-        fb = self.frame_buffer
-        sb = self.sc_buffer
+        fb  = self.frame_buffer
+        fsb = self.sc_buffer
+        sb  = []
+
+        # Make sb only contain the sc_buffer's extracted status integer.
+        for frame in fsb:
+            sb.append(frame[0])
 
         toRet = None
 
         # If reading a short format.
         if self.slow_channel_format == "Short":
-            # toRet = AnalyzerFrame('status', fb[0].start_time, fb[len(fb)-1].end_time, {
-            #     'status': 'endd'
-            #     })
 
             # Extract the last 16 elements from the slow-channel buffer.
             slow_frame = sb[-16:]
 
-            bit2s = self.ints_bit_serialize(slow_frame, 2)
+            bit2s = self.__ints_bit_serialize(slow_frame, 2)
 
             crc_data   = (bit2s >> 4)  & 0xFFF
             computed_crc = crc.gen_crc_4(crc_data, 3)
@@ -117,13 +121,14 @@ class Hla(HighLevelAnalyzer):
                 )
 
             if read_crc != computed_crc:
-                toRet = AnalyzerFrame('error', fb[0].start_time, fb[len(fb)-1].end_time, {
+                print(f"pre-short error- fsb: {fsb}")
+                toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'error': 'CRC Mismatch'
                     })
             else:
                 decoded = decode_short.decode(message_id, data_byte)
 
-                toRet = AnalyzerFrame('short_frame', fb[0].start_time, fb[len(fb)-1].end_time, {
+                toRet = AnalyzerFrame('short_frame', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'slow_frame': decoded[0]
                     })
 
@@ -133,8 +138,8 @@ class Hla(HighLevelAnalyzer):
             slow_frame = sb[-18:]
 
             ### Extract individual frame elements ###
-            bit3s = self.ints_bit_serialize(slow_frame, 3)
-            bit2s = self.ints_bit_serialize(slow_frame, 2)
+            bit3s = self.__ints_bit_serialize(slow_frame, 3)
+            bit2s = self.__ints_bit_serialize(slow_frame, 2)
 
             # Convert data bits into a 24-bit integer for the CRC check.
             combined_message = 0
@@ -168,25 +173,27 @@ class Hla(HighLevelAnalyzer):
                 )
 
             if read_crc != computed_crc:
-                toRet = AnalyzerFrame('error', fb[0].start_time, fb[len(fb)-1].end_time, {
+                toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'error': 'CRC Mismatch'
                     })
             else:
+                data = None
                 decoded = None
 
                 if c == 0:
                     message_id = (b3_nibble_1 << 4) | (b3_nibble_2)
-                    decoded = decode_enhanced.decode_8bit_id(message_id, b2_data)
+                    data = b2_data
+                    decoded = decode_enhanced.decode_8bit_id(message_id, data)
                 else:
                     message_id = b3_nibble_1
                     data = (b3_nibble_2 << 12) | (b2_data)
                     decoded = decode_enhanced.decode_4bit_id(message_id, data)
 
-                toRet = AnalyzerFrame('enhanced_frame', fb[0].start_time, fb[len(fb)-1].end_time, {
-                    'slow_frame': str(decoded)
+                toRet = AnalyzerFrame('enhanced_frame', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
+                    'slow_frame': f'{decoded[0]}'
                     })
 
-        sb.clear()
+        self.sc_buffer.clear()
 
         return toRet
 
@@ -198,12 +205,24 @@ class Hla(HighLevelAnalyzer):
         
         toRet = None
 
-        fb = self.frame_buffer
-        sb = self.sc_buffer
+        fb  = self.frame_buffer
+        fsb = self.sc_buffer
+        sb  = []
+
+        # Make sb only contain the sc_buffer's extracted status integer.
+        for frame in fsb:
+            sb.append(frame[0])
 
         ### Extract the frame's data and status information. ###
 
-        data = list(filter(lambda x: (x.type == 'fc_data'), fb))
+        data_frames = list(filter(lambda x: (x.type == 'fc_data'), fb))
+        
+        data = []
+
+        for f in data_frames:
+            data.append(int.from_bytes(f.data['data'], 'little'))
+
+        print(f"fc data: {data}")
 
         status = None
 
@@ -222,35 +241,50 @@ class Hla(HighLevelAnalyzer):
         if self.slow_channel_format == 'Short':
             # If the beginning of a short channel frame is detected.
             if (status >> 3) & 0x1:
-                sc_output_frame = self.end_sc()
+                if len(fsb) >= 16:
+                    sc_output_frame = self.end_sc()
+                else:
+                    self.sc_buffer.clear()
         # If we're attempting to parse an enhanced message format for the slow channel.
         else:
             checks = ( len(sb) - 18 ) + 1
 
             if checks > 0:                
-                status_bits = self.ints_bit_serialize(sb, 3)
+                status_bits = self.__ints_bit_serialize(sb, 3)
 
                 # Iterate through our status bits and check if there's a pattern indicating
                 # a finished enhanced frame.
                 pattern = 0b111111100000100001
-                match =   0b111111000000000000
+                match   = 0b111111000000000000
 
                 if (status_bits & pattern) == match:
-                    sc_output_frame = self.end_sc()
+                    if len(fsb) >= 18:
+                        sc_output_frame = self.end_sc()
+                    else:
+                        self.sc_buffer.clear()
 
         ### Specify which AnalyzerFrame to return ###
 
         if self.display == "Fast Channel Data":
             if len(data) > 0:
-                toRet = AnalyzerFrame('fc_data', data[0].start_time, data[len(data)-1].end_time, {
-                    'fc_data': 'deeta'
+                ch1_data = (data[0] << 8) | (data[1] << 4) | (data[2])
+
+                x1 = 5e3
+                x2 = -120e3
+                y1 = 193
+                y2 = 3896
+
+                phys = x1 + ( (x2 - x1) / (y2 - y1) ) * ( ch1_data - y1 )
+
+                toRet = AnalyzerFrame('fc_data', fb[0].start_time, fb[-1].end_time, {
+                    'fc_data': phys
                     })
         else:
             toRet = sc_output_frame
 
         ### Append / Clear buffers ###
 
-        self.sc_buffer.append(status)
+        self.sc_buffer.append( (status, copy.copy(fb)) )
 
         self.frame_buffer.clear()
 

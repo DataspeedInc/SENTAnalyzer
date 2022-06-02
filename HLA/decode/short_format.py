@@ -8,8 +8,20 @@ class MessageTypes(Enum):
     RELATIVE_HUMIDITY_LOW    = 0x3
     BAROMETRIC_PRESSURE_HIGH = 0x4
     BAROMETRIC_PRESSURE_LOW  = 0x5
-    RESERVED                 = 0x6
+    RESERVED                 = 0x6#-0xE
     ERROR_CODES              = 0xF
+
+    def correct(val: int):
+        v = copy.deepcopy(val)
+        
+        # RESERVED correction
+        if (0x6 < v <= 0xE):
+            v = 0x6
+        
+        return v
+    
+    def convert(val: int):
+        return MessageTypes( MessageTypes.correct(val) )
 
 class ErrorCodes(Enum):
     AIR_TEMPERATURE_OOR_HIGH     = 0x0
@@ -30,14 +42,7 @@ def decode(message_id: int, data: int):
     - (If applicable) A tuple of the applicable error codes.
     '''
 
-    id = copy.deepcopy(message_id)
-
-    # If the message id is in the reserved range, set the id to
-    # be the single numerical value of the reserved enum value.
-    if 0x6 <= id <= 0xE:
-        id = 0x6
-
-    mt = MessageTypes(id & 0xF)
+    mt = MessageTypes.convert(message_id & 0xF)
     ec = []
 
     if mt == MessageTypes.ERROR_CODES:
@@ -79,7 +84,7 @@ def __message_to_string(mt: MessageTypes, ec: list, data: int):
     toRet += ": "
 
     if mt != MessageTypes.ERROR_CODES:
-        toRet += f"{'{0:08b}'.format(data)} - {data}"
+        toRet += '{0:08b} : 0x{0:02X} : {0}'.format(data)
     else:
         toRet += str(ec)
 
