@@ -129,7 +129,7 @@ class Hla(HighLevelAnalyzer):
                 decoded = decode_short.decode(message_id, data_byte)
 
                 toRet = AnalyzerFrame('short_frame', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
-                    'slow_frame': decoded[0]
+                    'slow_frame': str(decoded)
                     })
 
         # If reading an enhanced format.
@@ -276,8 +276,10 @@ class Hla(HighLevelAnalyzer):
 
                 phys = x1 + ( (x2 - x1) / (y2 - y1) ) * ( ch1_data - y1 )
 
+                decoded = decode_fc.decode( 0x003, tuple(data), ((x1, x2),) )
+
                 toRet = AnalyzerFrame('fc_data', fb[0].start_time, fb[-1].end_time, {
-                    'fc_data': phys
+                    'fc_data': str(decoded)
                     })
         else:
             toRet = sc_output_frame
