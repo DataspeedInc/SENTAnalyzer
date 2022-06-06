@@ -49,7 +49,7 @@ class TransferFunctions(Enum):
     LINEAR_HIGH_TEMPERATURE    = auto()
     LINEAR_POSITION_SENSOR     = auto()
     ANGLE_POSITION_SENSOR      = auto()
-    RELATIVE_POSITION_SENSOR      = auto()
+    RELATIVE_POSITION_SENSOR   = auto()
     RATIO_SENSING              = auto()
 
 '''
@@ -429,6 +429,7 @@ def __channel_data_decode(data: int, bit_width:int, transfer_function: TransferF
 
     value = None
 
+    # If the type of transfer function is linear, or custom-linear.
     if   tf_type == TFType.LINEAR:
         def x_val_parsing(x_val: int):
             m_corrected = e_corrected = None
@@ -441,9 +442,7 @@ def __channel_data_decode(data: int, bit_width:int, transfer_function: TransferF
             if e_format == ValueFormat.SIGNED:
                 e_corrected = __tc_correction(x_val, ne)
             else:
-                e_corrected = ( x_val ) & (2 ** ne - 1)\
-
-            print(f"m_corrected: {m_corrected}, e_corrected: {e_corrected}")
+                e_corrected = ( x_val ) & (2 ** ne - 1)
 
             return m_corrected * ( 10 ** ( e_corrected + xe_offset ) )
         
@@ -460,8 +459,12 @@ def __channel_data_decode(data: int, bit_width:int, transfer_function: TransferF
             # Assign the value to be returned as none, since the custom linear data
             # cannot be properly decoded without provided x values.
             value = None
+
+    # If the type of transfer function is default linear.
     elif tf_type == TFType.DEFAULT_LINEAR:
         value = (data * default_linear_lsb_per) + default_linear_offset
+
+    # If the type of transfer function is for an encoded ratio.
     elif tf_type == TFType.RATIO:
         value = (data - 444) / 32
 

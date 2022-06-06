@@ -111,18 +111,6 @@ class Hla(HighLevelAnalyzer):
             data_byte  = (bit2s >> 4)  & 0xFF
             read_crc   = (bit2s)       & 0xF
 
-            print(f"frame: {slow_frame}\n- - - -")
-
-            print(
-                f"Extracted frame info:\n"
-                f"message_id:\t{'{0:04b}'.format(message_id)}\n"
-                f"data_byte:\t{'{0:08b}'.format(data_byte)}\n"
-                f"crc:\t\t{'{0:04b}'.format(read_crc)}\n"
-                f"computed crc:\t{'{0:04b}'.format(computed_crc)}\n"
-                f"raw bit2s:\t{'{0:016b}'.format(bit2s)}\n"
-                f"----------------------------"
-                )
-
             if read_crc != computed_crc:
                 toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'error': 'CRC Mismatch'
@@ -131,7 +119,7 @@ class Hla(HighLevelAnalyzer):
                 decoded = decode_short.decode(message_id, data_byte)
 
                 toRet = AnalyzerFrame('short_frame', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
-                    'slow_frame': str(decoded)
+                    'slow_frame': decoded[0]
                     })
 
         # If reading an enhanced format.
@@ -159,20 +147,6 @@ class Hla(HighLevelAnalyzer):
             b3_nibble_2 = (bit3s >> 1)  & 0xF
             read_crc    = (bit2s >> 12) & 0x3F
             b2_data     = (bit2s)       & 0xFFF 
-
-            print(
-                f"Extracted frame info:\n"
-                f"C bit:\t\t{c}\n"
-                f"b3_nibble_1:\t{'{0:04b}'.format(b3_nibble_1)}\n"
-                f"b3_nibble_2:\t{'{0:04b}'.format(b3_nibble_2)}\n"
-                f"crc:\t\t{'{0:06b}'.format(read_crc)}\n"
-                f"computed crc:\t{'{0:06b}'.format(computed_crc)}\n"
-                f"b2_data:\t{'{0:012b}'.format(b2_data)}\n"
-                f"raw bit3s:\t{'{0:018b}'.format(bit3s)}\n"
-                f"raw bit2s:\t{'{0:018b}'.format(bit2s)}\n"
-                f"combined data:\t{'{0:024b}'.format(combined_message)}\n"
-                f"----------------------------"
-                )
 
             if read_crc != computed_crc:
                 toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
@@ -232,8 +206,6 @@ class Hla(HighLevelAnalyzer):
         for f in data_frames:
             data.append(int.from_bytes(f.data['data'], 'little'))
 
-        print(f"fc data: {data}")
-
         status = None
 
         # Catch an IndexError in the case that this frame is missing a status pulse.
@@ -291,7 +263,9 @@ class Hla(HighLevelAnalyzer):
 
                 fc_data_str = ""
                 
-                if sensor_type is not None:
+                # Only attempt to parse the data to a readable unit if the sensor is defined, and
+                # the user is requesting for the data to be parsed.
+                if sensor_type is not None and self.attempt_fc_parsing == 'Yes':
                     x_vals = ( (ch1_x1, ch1_x2), (ch2_x1, ch2_x2) )
                     y_vals = ( (ch1_y1, ch1_y2), (ch2_y1, ch2_y2) )
 
@@ -311,7 +285,7 @@ class Hla(HighLevelAnalyzer):
                         data_int <<= 4
                         data_int |= ( n & 0xF )
                     
-                    strd_data = ('{0:0' + str(len(data) * 4) + 'b} | 0x{0:0' + str(len(data)) + 'X} | {0}').format(data_int)
+                    strd_data = ('{0:0' + str(len(data) * 4) + 'b} : 0x{0:0' + str(len(data)) + 'X} : {0}').format(data_int)
                     fc_data_str = "Raw data: " + strd_data
 
                 toRet = AnalyzerFrame('fc_data', fb[0].start_time, fb[-1].end_time, {
