@@ -10,7 +10,8 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	pausePulseEnabled(true),
 	spc(false),
 	legacyCRC(false),
-	numberOfDataNibbles(6)
+	numberOfDataNibbles(6),
+	SCGeneration(SCGenerationOptions::Short)
 {
 	mInputChannelInterface.reset( new AnalyzerSettingInterfaceChannel() );
 	mInputChannelInterface->SetTitleAndTooltip( "Serial", "Standard SENT (SAE J2716)" );
@@ -47,6 +48,17 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	AddInterface( pausePulseInterface.get() );
 	AddInterface( legacyCRCInterface.get() );
 
+	// Generation tools //
+	#ifdef GENERATION_TOOLS
+	SCGenerationInterface.reset( new AnalyzerSettingInterfaceNumberList() );
+	SCGenerationInterface->SetTitleAndTooltip( "Slow channel generation format", 
+		"Specify which format will be generated into the slow-channel while generating in demo mode." );
+	SCGenerationInterface->AddNumber( SCGenerationOptions::Short, "Short Format", "Short Serial Message Format" );
+	SCGenerationInterface->AddNumber( SCGenerationOptions::Enhanced, "Enhanced Format", "Enhanced Serial Message Format" );
+
+	AddInterface( SCGenerationInterface.get() );
+	#endif
+
 	AddExportOption( 0, "Export as text/csv file" );
 	AddExportExtension( 0, "text", "txt" );
 	AddExportExtension( 0, "csv", "csv" );
@@ -79,6 +91,10 @@ bool SENTAnalyzerSettings::SetSettingsFromInterfaces()
 
 	numberOfDataNibbles = dataNibblesInterface->GetInteger();
 	legacyCRC = legacyCRCInterface->GetValue();
+
+	#ifdef GENERATION_TOOLS
+	SCGeneration = (SCGenerationOptions)SCGenerationInterface->GetNumber();
+	#endif
 
 	ClearChannels();
 	AddChannel( mInputChannel, "SENT (SAE J2716)", true );

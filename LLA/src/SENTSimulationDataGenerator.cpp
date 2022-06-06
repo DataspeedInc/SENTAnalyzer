@@ -5,6 +5,45 @@
 
 const int fc_data [6] = {7, 4, 8, 7, 4, 8};
 const int device_ticks [4] = {11, 21, 38, 65};
+const char enhanced_nibbles [18] = {
+	0xC, // 1100
+	0xC, // 1100
+	0x8, // 1000
+	0x8, // 1000
+	0xC, // 1100
+	0xC, // 1100
+	0x0, // 0000
+	0x8, // 1000
+	0x0, // 0000
+	0xC, // 1100
+	0x4, // 0100
+	0xC, // 1100
+	0x0, // 0000
+	0x8, // 1000
+	0x0, // 0000
+	0xC, // 1100
+	0x4, // 0100
+	0x4  // 0100
+};
+
+const char short_nibbles [16] = {
+	0x8,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0
+};
 
 SENTSimulationDataGenerator::SENTSimulationDataGenerator()
 {
@@ -60,6 +99,21 @@ void SENTSimulationDataGenerator::CreateSerialByte()
 {
 	U32 samples_per_tick = (mSimulationSampleRateHz * mSettings->tick_time_us) / 1000000;
 
+	const char * sc_nibbles;
+	int sc_nibbles_len;
+
+	switch ( mSettings->SCGeneration )
+	{
+		case SENTAnalyzerSettings::SCGenerationOptions::Short:
+			sc_nibbles = short_nibbles;
+			sc_nibbles_len = sizeof(short_nibbles);
+			break;
+		case SENTAnalyzerSettings::SCGenerationOptions::Enhanced:
+			sc_nibbles = enhanced_nibbles;
+			sc_nibbles_len = sizeof(enhanced_nibbles);
+			break;
+	}
+
 	if ( mSettings->pausePulseEnabled )
 	{
 	    /* First, a normal SENT frame */
@@ -73,7 +127,9 @@ void SENTSimulationDataGenerator::CreateSerialByte()
 		/* Calibration pulse */
 		AddNibble(56, samples_per_tick);
 		/* Status nibble */
-		AddNibble(12, samples_per_tick);
+		AddNibble(12 + sc_nibbles[mStatus], samples_per_tick);
+		mStatus = (mStatus + 1) % sc_nibbles_len;
+
 		/* Fast channel nibbles */
 		for (U8 counter = 0; counter < mSettings->numberOfDataNibbles; counter++) {
 			AddNibble(fc_data[counter] + 12, samples_per_tick);
@@ -94,7 +150,8 @@ void SENTSimulationDataGenerator::CreateSerialByte()
 		/* Calibration pulse */
 		AddNibble(56, samples_per_tick);
 		/* Status nibble */
-		AddNibble(12, samples_per_tick);
+		AddNibble(12 + sc_nibbles[mStatus], samples_per_tick);
+		mStatus = (mStatus + 1) % sc_nibbles_len;
 		/* Fast channel nibbles */
 		for (U8 counter = 0; counter < mSettings->numberOfDataNibbles; counter++) {
 			AddNibble(fc_data[counter] + 12, samples_per_tick);

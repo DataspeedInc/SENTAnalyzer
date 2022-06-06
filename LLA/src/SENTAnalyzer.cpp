@@ -120,7 +120,7 @@ void SENTAnalyzer::addFrameV2(Frame &frame)
 			break;
 		case SENTNibbleType::FCNibble:
 			framev2.AddByte("data", frame.mData1);
-			typeName = "fc";
+			typeName = "fc_data";
 			break;
 		case SENTNibbleType::CRCNibble:
 			framev2.AddByte("data", frame.mData1);

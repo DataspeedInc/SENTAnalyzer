@@ -22,13 +22,14 @@ jobs:
       # Build
       - run: 
           command: |
+            cd LLA
             mkdir _build
             cd _build
             cmake ..
             cmake --build .
       # Persist build to workspace
       - persist_to_workspace:
-          root: _build/Analyzers
+          root: LLA/_build/Analyzers
           paths:
             - libSENT_analyzer.so
 
@@ -40,12 +41,12 @@ jobs:
       - checkout
       - run: choco install cmake -y --installargs 'ADD_CMAKE_TO_PATH=System'
       - run: 
-          command: refreshenv && mkdir _build && cd _build && cmake ..
+          command: refreshenv && cd LLA && mkdir _build && cd _build && cmake ..
           shell: cmd.exe 
-      - run: msbuild _build\SENT_analyzer.sln /t:SENT_analyzer /p:Configuration="Release" /p:Platform="x64" /p:BuildProjectReferences=false 
+      - run: msbuild LLA\_build\SENT_analyzer.sln /t:SENT_analyzer /p:Configuration="Release" /p:Platform="x64" /p:BuildProjectReferences=false 
       - run: cd _build; dir
       - persist_to_workspace:
-          root: _build/Analyzers/Release
+          root: LLA/_build/Analyzers/Release
           paths:
             - SENT_analyzer.dll
 
@@ -56,13 +57,21 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: wget https://github.com/tcnksm/ghr/releases/download/v0.14.0/ghr_v0.14.0_linux_amd64.tar.gz
-      - run: tar -xf ghr_v0.14.0_linux_amd64.tar.gz
+      - checkout
       - run:
           command: |
-            cd ghr_v0.14.0_linux_amd64
+            cd HLA
+            zip -r /tmp/workspace/SENT_HLA.zip .
+      - run: 
+          command: |
+            mkdir /tmp/ghr
+            cd /tmp/ghr
+            wget https://github.com/tcnksm/ghr/releases/download/v0.14.0/ghr_v0.14.0_linux_amd64.tar.gz
+            tar -xf ghr_v0.14.0_linux_amd64.tar.gz -C /tmp/
+      - run: 
+          command: |
             releasetag=$(TZ=America/Detroit date '+%m-%d-%y_%H%M')
-            ./ghr -u DataspeedInc -r SENTAnalyzer -t $GITHUB_API_KEY -name "Release from $releasetag" $releasetag /tmp/workspace
+            /tmp/ghr_v0.14.0_linux_amd64/ghr -u DataspeedInc -r SENTAnalyzer -t $GITHUB_API_KEY -name "Release from $releasetag" $releasetag /tmp/workspace
 
 workflows:
   version: 2

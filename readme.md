@@ -6,12 +6,10 @@ This plugin allows decoding SENT frames of up to 6 data nibbles and allows expor
 
 - Builtin slow message decoding
 - Automatic detection of tick time
-- SPC support
-- Aggregation of individual nibble data into into FC1/FC2 data --> Loads of different configurations, could get complex
 
 ## Developing:
 
-This plugin has been setup to use vscode as it's main code editor/ide.
+This plugin has been setup to use vscode as it's main code editor/IDE.
 
 The current vscode setup looks for the Saleae Logic Analyzer SDK to be cloned into the `_sdk` folder in the project repository, which can be done by running the following:
 ```
