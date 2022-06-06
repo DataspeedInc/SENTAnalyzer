@@ -4,6 +4,7 @@ import crc
 import decode.short_format as decode_short
 import decode.enhanced_format as decode_enhanced
 import decode.fc_data as decode_fc
+from decode.enhanced_format import MessageTypes8Bit
 
 import math
 import copy
@@ -20,6 +21,8 @@ class Hla(HighLevelAnalyzer):
     sc_buffer = []
     using_spc = False
     #enhanced_sc = False
+
+    sc_cached_frames = {}
 
     # An optional list of types this analyzer produces, providing a way to customize the way frames are displayed in Logic 2.
     result_types = {
@@ -121,7 +124,6 @@ class Hla(HighLevelAnalyzer):
                 )
 
             if read_crc != computed_crc:
-                print(f"pre-short error- fsb: {fsb}")
                 toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'error': 'CRC Mismatch'
                     })
@@ -184,6 +186,14 @@ class Hla(HighLevelAnalyzer):
                     message_id = (b3_nibble_1 << 4) | (b3_nibble_2)
                     data = b2_data
                     decoded = decode_enhanced.decode_8bit_id(message_id, data)
+
+                    sc_cache = self.sc_cached_frames
+
+                    sc_cache[decoded[1]] = None
+
+                    if len(decoded) >= 3:
+                        # Add this sc frame's additional information in case the message is decoded with some.
+                        sc_cache[decoded[1]] = decoded[2]
                 else:
                     message_id = b3_nibble_1
                     data = (b3_nibble_2 << 12) | (b2_data)
@@ -267,19 +277,45 @@ class Hla(HighLevelAnalyzer):
 
         if self.display == "Fast Channel Data":
             if len(data) > 0:
-                ch1_data = (data[0] << 8) | (data[1] << 4) | (data[2])
+                sc_cache = self.sc_cached_frames
 
-                x1 = 5e3
-                x2 = -120e3
-                y1 = 193
-                y2 = 3896
+                sensor_type = sc_cache.get(MessageTypes8Bit.CHANNEL_1_2_SENSOR_TYPE)
+                ch1_x1      = sc_cache.get(MessageTypes8Bit.FC_1_CHARACTERISTIC_X1)
+                ch1_x2      = sc_cache.get(MessageTypes8Bit.FC_1_CHARACTERISTIC_X2)
+                ch2_x1      = sc_cache.get(MessageTypes8Bit.FC_2_CHARACTERISTIC_X1)
+                ch2_x2      = sc_cache.get(MessageTypes8Bit.FC_2_CHARACTERISTIC_X2)
+                ch1_y1      = sc_cache.get(MessageTypes8Bit.FC_1_CHARACTERISTIC_Y1)
+                ch1_y2      = sc_cache.get(MessageTypes8Bit.FC_1_CHARACTERISTIC_Y2)
+                ch2_y1      = sc_cache.get(MessageTypes8Bit.FC_2_CHARACTERISTIC_Y1)
+                ch2_y2      = sc_cache.get(MessageTypes8Bit.FC_2_CHARACTERISTIC_Y2)
 
-                phys = x1 + ( (x2 - x1) / (y2 - y1) ) * ( ch1_data - y1 )
+                fc_data_str = ""
+                
+                if sensor_type is not None:
+                    x_vals = ( (ch1_x1, ch1_x2), (ch2_x1, ch2_x2) )
+                    y_vals = ( (ch1_y1, ch1_y2), (ch2_y1, ch2_y2) )
 
-                decoded = decode_fc.decode( 0x003, tuple(data), ((x1, x2),) )
+                    decoded = decode_fc.decode( sensor_type, tuple(data), x_vals, y_vals )
+
+                    #fc_data_str = f"decoded_ch1[0] type: {type(decoded_ch1)} - decoded_ch1: {str(decoded_ch1)}"
+
+                    if decoded[0] is not None:
+                        fc_data_str = f"Ch 1: {'{:.2f}'.format(decoded[0][0])} {decoded[0][1]}"
+
+                    if decoded[1] is not None:
+                        fc_data_str += f" || Char 2: {'{:.2f}'.format(decoded[1][0])} {decoded[1][1]}"
+                else:
+                    data_int = 0
+
+                    for n in data:
+                        data_int <<= 4
+                        data_int |= ( n & 0xF )
+                    
+                    strd_data = ('{0:0' + str(len(data) * 4) + 'b} | 0x{0:0' + str(len(data)) + 'X} | {0}').format(data_int)
+                    fc_data_str = "Raw data: " + strd_data
 
                 toRet = AnalyzerFrame('fc_data', fb[0].start_time, fb[-1].end_time, {
-                    'fc_data': str(decoded)
+                    'fc_data': fc_data_str
                     })
         else:
             toRet = sc_output_frame

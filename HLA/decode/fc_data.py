@@ -1,5 +1,6 @@
 from enum import Enum, auto
 import math
+import copy
 
 class ValueFormat(Enum):
     SIGNED   = auto()
@@ -44,7 +45,7 @@ class TransferFunctions(Enum):
     SPECIAL_LINEAR_TEMPERATURE = auto()
     DEFAULT_LINEAR_TEMPERATURE = auto()
     LINEAR_MAF                 = auto()
-    SENSOR_SPECIFIC_MAF        = auto()
+    #SENSOR_SPECIFIC_MAF        = auto()
     LINEAR_HIGH_TEMPERATURE    = auto()
     LINEAR_POSITION_SENSOR     = auto()
     ANGLE_POSITION_SENSOR      = auto()
@@ -102,46 +103,46 @@ sensor_definitions = {
         (TransferFunctions.LINEAR_MAF, None) ),                                                    
     0x012: # MAF (hi-res, non-lin)
         (FrameFormats.H_7,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, None) ),                                           
+        (None, None) ),                                           
     0x013: # MAF (hi-res, lin) / Pressure
         (FrameFormats.H_7,
         (TransferFunctions.LINEAR_MAF, TransferFunctions.LINEAR_PRESSURE) ),                       
     0x014: # MAF (hi-res, non-lin) / Pressure
         (FrameFormats.H_7,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, TransferFunctions.LINEAR_PRESSURE) ),              
+        (None, TransferFunctions.LINEAR_PRESSURE) ),              
     0x015: # MAF (lin) / Pressure (hi-res)
         (FrameFormats.H_6,
         (TransferFunctions.LINEAR_MAF, TransferFunctions.LINEAR_PRESSURE) ),                       
     0x016: # MAF (non-lin) / Pressure (hi-res)
         (FrameFormats.H_6,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, TransferFunctions.LINEAR_PRESSURE) ),              
+        (None, TransferFunctions.LINEAR_PRESSURE) ),              
     0x017: # MAF (lin)
         (FrameFormats.H_6,
         (TransferFunctions.LINEAR_MAF, None) ),                                                    
     0x018: # MAF (non-lin)
         (FrameFormats.H_6,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, None) ),                                           
+        (None, None) ),                                           
     0x019: # MAF (lin) / Temperature
         (FrameFormats.H_6,
         (TransferFunctions.LINEAR_MAF, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),            
     0x01A: # MAF (non-lin) / Temperature
         (FrameFormats.H_6,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),   
+        (None, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),   
     0x01B: # MAF (hi-res, lin) / Temperature
         (FrameFormats.H_7,
         (TransferFunctions.LINEAR_MAF, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),            
     0x01C: # MAF (hi-res, non-lin) / Temperature
         (FrameFormats.H_7,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),   
+        (None, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),   
     0x01D: # MAF (low-res, non-lin)
         (FrameFormats.H_1,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, None) ),                                           
+        (None, None) ),                                           
     0x01E: # MAF (low-res, non-lin) / Pressure
         (FrameFormats.H_1,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, TransferFunctions.LINEAR_PRESSURE) ),              
+        (None, TransferFunctions.LINEAR_PRESSURE) ),              
     0x01F: # MAF (low-res, non-lin) / Temperature
         (FrameFormats.H_1,
-        (TransferFunctions.SENSOR_SPECIFIC_MAF, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),   
+        (None, TransferFunctions.DEFAULT_LINEAR_TEMPERATURE) ),   
     0x041: # Temperature
         (FrameFormats.H_1,
         (TransferFunctions.DEFAULT_LINEAR_TEMPERATURE, None) ),                                    
@@ -279,9 +280,25 @@ sensor_definitions = {
         (TransferFunctions.RATIO_SENSING, TransferFunctions.LINEAR_PRESSURE) ),                    
 }
 
-def decode(sensor: int, data: tuple, x_vals_raw: tuple = None, y_vals: tuple = None):
+def decode(sensor: int, data: tuple, x_vals_raw: tuple = ((None, None), (None, None)), y_vals: tuple = ((None, None), (None, None))):
+    '''
+    Expects assigned values for sensor and data at minimum.
+
+    Returns a tuple of tuples, with each sub-tuple containing the converted value + unit pair for each channel.
+
+    Example Return:
+    ( (123.45, 'K'), (324.33, 'Pa') )
+
+    If one of the channels doesn't exist, or cannot be converted, the sub-tuple for that channel will be None.
+    '''
     
     global sensor_definitions
+
+    # Copy parameters from the caller. #
+    sensor     = copy.deepcopy(sensor)
+    data       = copy.deepcopy(data)
+    x_vals_raw = copy.deepcopy(x_vals_raw)
+    y_vals     = list(copy.deepcopy(y_vals))
 
     ff,     tf_info = sensor_definitions[sensor]
     ch1_tf, ch2_tf  = tf_info
@@ -292,40 +309,166 @@ def decode(sensor: int, data: tuple, x_vals_raw: tuple = None, y_vals: tuple = N
     ch1_data, ch2_data = inorder_data[1]
 
     ''' Obtain default y_vals if there were no y_vals provided from the caller '''
-    if y_vals is None:
-        yv = []
+    # Check / correct Ch 1. y Vals #
+    if ch1_n is not None and (y_vals[0][0] is None or y_vals[0][1] is None):
+        y_vals[0] = __default_y_vals(ch1_n)
 
-        yv.append( __default_y_vals(ch1_n) )
-
-        if ch2_n is not None:
-            yv.append( __default_y_vals(ch2_n) )
-        
-        y_vals = tuple(yv)
+    # Check / correct Ch 2. y Vals #
+    if ch2_n is not None and (y_vals[1][0] is None or y_vals[1][1] is None):
+        y_vals[1] = __default_y_vals(ch2_n)
 
     toRet = []
 
-    toRet.append( __channel_data_decode(ch1_data, ch1_tf, x_vals_raw[0], y_vals[0]) )
+    toRet.append( __channel_data_decode(ch1_data, ch1_n, ch1_tf, x_vals_raw[0], tuple(y_vals[0])) )
 
-    if ch2_data is not None:
-        toRet.append( __channel_data_decode(ch2_data, ch2_tf, x_vals_raw[1], y_vals[1]) )
+    toRet.append( __channel_data_decode(ch2_data, ch2_n, ch2_tf, x_vals_raw[1], tuple(y_vals[1])) )
 
     return tuple(toRet)
 
-def __channel_data_decode(data: int, transfer_function: TransferFunctions, x_vals_raw: tuple, y_vals: tuple):
+def __channel_data_decode(data: int, bit_width:int, transfer_function: TransferFunctions, x_vals_raw: tuple, y_vals: tuple):
     '''
-    Returns a tuple containing the transformed data as a number, and the unit as a string.
+    If the data can be decoded with the information provided,
+    this returns a tuple containing the transformed data as a number, and the unit as a string.
     
     Example: (1667.23, "kPa")
+
+    Otherwise, None is returned.
     '''
     
+    class TFType(Enum):
+        LINEAR         = auto()
+        DEFAULT_LINEAR = auto()
+        RATIO          = auto()
+
+    tf_type = None
+
     tf = transfer_function
 
-    nm, ne, xe_offset, m_format, e_format = None
+    default_linear_lsb_per = None
+    default_linear_offset = None
 
-    # if  tf == TransferFunctions.E_2:
-    #     pass
+    nm = ne = xe_offset = m_format = e_format = None
+    
+    unit = ""
 
-    return (1337.69, "kPa")
+    '''
+    Set the decoding variables necessary for the calculation 
+    depending on the transfer function.
+    '''
+    if   tf == TransferFunctions.LINEAR_PRESSURE:
+        tf_type = TFType.LINEAR
+        unit = 'Pa'
+        nm = 9
+        m_format = ValueFormat.SIGNED
+        ne = 3
+        e_format = ValueFormat.UNSIGNED
+        xe_offset = 0
+    elif tf == TransferFunctions.SPECIAL_LINEAR_TEMPERATURE:
+        tf_type = TFType.LINEAR
+        unit = 'K'
+        nm = 11
+        m_format = ValueFormat.UNSIGNED
+        ne = 1
+        e_format = ValueFormat.SIGNED
+        xe_offset = 0
+    elif tf == TransferFunctions.DEFAULT_LINEAR_TEMPERATURE:
+        tf_type = TFType.DEFAULT_LINEAR
+        unit = 'K'
+        char = {
+            12: (8, 200),
+            10: (4, 220),
+            8:  (1, 220),
+        }
+        
+        is_default_linear      = True
+        default_linear_lsb_per = char[bit_width][0]
+        default_linear_offset  = char[bit_width][1]
+    elif tf == TransferFunctions.LINEAR_MAF:
+        tf_type = TFType.LINEAR
+        unit = 'kg/h'
+        nm = 10
+        m_format = ValueFormat.SIGNED
+        ne = 2
+        e_format = ValueFormat.UNSIGNED
+        xe_offset = 0
+    elif tf == TransferFunctions.LINEAR_HIGH_TEMPERATURE:
+        tf_type = TFType.DEFAULT_LINEAR
+        unit = 'K'
+        is_default_linear      = True
+        default_linear_lsb_per = 3
+        default_linear_offset  = 200
+    elif tf == TransferFunctions.LINEAR_POSITION_SENSOR:
+        tf_type = TFType.LINEAR
+        unit = 'm'
+        nm = 9
+        m_format = ValueFormat.SIGNED
+        ne = 3
+        e_format = ValueFormat.UNSIGNED
+        xe_offset = -6
+    elif tf == TransferFunctions.ANGLE_POSITION_SENSOR:
+        tf_type = TFType.LINEAR
+        unit = '°'
+        nm = 9
+        m_format = ValueFormat.SIGNED
+        ne = 3
+        e_format = ValueFormat.UNSIGNED
+        xe_offset = -3
+    elif tf == TransferFunctions.RELATIVE_POSITION_SENSOR:
+        tf_type = TFType.LINEAR
+        unit = 'm'
+        nm = 9
+        m_format = ValueFormat.SIGNED
+        ne = 3
+        e_format = ValueFormat.UNSIGNED
+        xe_offset = -3
+    elif tf == TransferFunctions.RATIO_SENSING:
+        unit = '%'
+        tf_type = TFType.RATIO
+
+    ''' Calculate the unit. '''
+
+    value = None
+
+    if   tf_type == TFType.LINEAR:
+        def x_val_parsing(x_val: int):
+            m_corrected = e_corrected = None
+
+            if m_format == ValueFormat.SIGNED:
+                m_corrected = __tc_correction(x_val >> ne, nm)
+            else:
+                m_corrected = ( x_val >> ne ) & (2 ** nm - 1)
+
+            if e_format == ValueFormat.SIGNED:
+                e_corrected = __tc_correction(x_val, ne)
+            else:
+                e_corrected = ( x_val ) & (2 ** ne - 1)\
+
+            print(f"m_corrected: {m_corrected}, e_corrected: {e_corrected}")
+
+            return m_corrected * ( 10 ** ( e_corrected + xe_offset ) )
+        
+        x1_raw, x2_raw = x_vals_raw
+
+        if x1_raw is not None and x2_raw is not None:
+            x1 = x_val_parsing(x1_raw)
+            x2 = x_val_parsing(x2_raw)
+
+            y1, y2 = y_vals
+
+            value = x1 + ( (x2 - x1) / (y2 - y1) * (data - y1) )
+        else:
+            # Assign the value to be returned as none, since the custom linear data
+            # cannot be properly decoded without provided x values.
+            value = None
+    elif tf_type == TFType.DEFAULT_LINEAR:
+        value = (data * default_linear_lsb_per) + default_linear_offset
+    elif tf_type == TFType.RATIO:
+        value = (data - 444) / 32
+
+    if value is not None:
+        return (value, unit)
+    else:
+        return None
 
 def __nibbles_to_int(nibbles, frame_format):
     '''
@@ -407,3 +550,26 @@ def __default_y_vals(bit_width: int):
     y2 = (2 ** n) - 7 - y1
 
     return (y1, y2)
+
+def __tc_correction(val: int, width: int):
+    '''
+    Interprets val to be an integer with a bit-width of width as a 2's compliment number.
+
+    Returns a python int representing that corrected number.
+    '''
+
+    mask = ( 2 ** width ) - 1
+
+    # Copy and mask off the value to the given width.
+    v = copy.deepcopy(val) & mask
+
+    twos_neg = ( v >> (width - 1) ) & 0x1
+
+    if twos_neg:
+        # Convert the twos negative value to it's unsigned version, and multiply it by -1.
+        v ^= mask
+        v += 1
+
+        v *= -1
+
+    return v

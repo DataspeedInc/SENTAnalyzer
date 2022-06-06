@@ -456,6 +456,8 @@ def decode_8bit_id(message_id: int, data: int):
         toRet.append( ManufacturerCodes.convert(data) )
     elif mt == MessageTypes8Bit.PROTOCOL_STD_REVISION:
         toRet.append( SENTRevisionCodes.convert(data) )
+    else:
+        toRet.append( data )
 
     toRet.insert(0, __message_to_string_8bit(toRet, data))
 
