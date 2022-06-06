@@ -26,6 +26,7 @@ protected:
 	SimulationChannelDescriptor mSerialSimulationData;
 
 	U8 mSPCDevice;
+	U8 mStatus;
 
 };
 #endif //SENT_SIMULATION_DATA_GENERATOR

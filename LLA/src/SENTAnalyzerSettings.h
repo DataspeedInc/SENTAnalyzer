@@ -7,6 +7,8 @@
 class SENTAnalyzerSettings : public AnalyzerSettings
 {
 public:
+	enum SCGenerationOptions { Short, Enhanced };
+	
 	SENTAnalyzerSettings();
 	virtual ~SENTAnalyzerSettings();
 
@@ -23,13 +25,16 @@ public:
 	bool spc;
 	bool legacyCRC;
 
+	SCGenerationOptions SCGeneration;
+
 protected:
-	std::unique_ptr< AnalyzerSettingInterfaceChannel >	mInputChannelInterface;
-	std::unique_ptr< AnalyzerSettingInterfaceText >   	tickTimeInterface;
-	std::unique_ptr< AnalyzerSettingInterfaceBool >		pausePulseInterface;
-	std::unique_ptr< AnalyzerSettingInterfaceInteger >	dataNibblesInterface;
-	std::unique_ptr< AnalyzerSettingInterfaceBool >		spcInterface;
-	std::unique_ptr< AnalyzerSettingInterfaceBool >		legacyCRCInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceChannel >	   mInputChannelInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceText >   	   tickTimeInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >		   pausePulseInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceInteger >	   dataNibblesInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >		   spcInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >        legacyCRCInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceNumberList >  SCGenerationInterface;
 };
 
 #endif //SENT_ANALYZER_SETTINGS

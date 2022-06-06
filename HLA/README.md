@@ -1,13 +1,6 @@
+# SENT (J2716) HLA
 
-  # SENT (J2716) HLA
-  
-## Getting started
+This is the high-level analyzer to use in conjunction with the Dataspeed SENT low-level analyzer.
 
-1. Build your extension by updating the Python files for your needs
-2. Create a public Github repo and push your code 
-3. Update this README
-4. Open the Logic app and publish your extension
-5. Create a Github release
-6. Debug your hardware like you've never done before :)
-
-  
+This HLA is able to decode both fast and slow-channel frames, and interpret fast-channel sensor information as
+actual units, assuming the SENT slow-channel describes the required sensor properties.
