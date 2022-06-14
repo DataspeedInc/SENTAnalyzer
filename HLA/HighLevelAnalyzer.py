@@ -15,6 +15,8 @@ class Hla(HighLevelAnalyzer):
     attempt_fc_parsing = ChoicesSetting(choices=('Yes', 'No'))
     display = ChoicesSetting(choices=('Fast Channel Data', 'Slow Channel Data'))
     slow_channel_format = ChoicesSetting(choices=('Short', 'Enhanced'))
+    ignore_fast_channel_crc = ChoicesSetting(choices=('No', 'Yes'))
+    ignore_slow_channel_crc = ChoicesSetting(choices=('No', 'Yes'))
 
     ### Instance Variables ###
     frame_buffer = []
@@ -111,7 +113,7 @@ class Hla(HighLevelAnalyzer):
             data_byte  = (bit2s >> 4)  & 0xFF
             read_crc   = (bit2s)       & 0xF
 
-            if read_crc != computed_crc:
+            if (self.ignore_slow_channel_crc == 'No') and (read_crc != computed_crc):
                 toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'error': 'CRC Mismatch'
                     })
@@ -148,7 +150,7 @@ class Hla(HighLevelAnalyzer):
             read_crc    = (bit2s >> 12) & 0x3F
             b2_data     = (bit2s)       & 0xFFF 
 
-            if read_crc != computed_crc:
+            if (self.ignore_slow_channel_crc == 'No') and (read_crc != computed_crc):
                 toRet = AnalyzerFrame('error', fsb[-1][1][0].start_time, fsb[-1][1][-1].end_time, {
                     'error': 'CRC Mismatch'
                     })
@@ -183,9 +185,10 @@ class Hla(HighLevelAnalyzer):
 
     def end_frame(self):
         # If the previous frame doesn't contain a passed crc check, return.
-        if not list(filter(lambda x: (x.type == 'crc'), self.frame_buffer)):
-            self.frame_buffer.clear()
-            return
+        if self.ignore_fast_channel_crc == 'No':
+            if not list(filter(lambda x: (x.type == 'crc'), self.frame_buffer)):
+                self.frame_buffer.clear()
+                return
         
         toRet = None
 
