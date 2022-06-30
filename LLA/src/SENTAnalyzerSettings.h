@@ -24,6 +24,7 @@ public:
 	U32 numberOfDataNibbles;
 	bool spc;
 	bool legacyCRC;
+	bool includeStatusInCRC;
 
 	SCGenerationOptions SCGeneration;
 
@@ -34,6 +35,8 @@ protected:
 	std::unique_ptr< AnalyzerSettingInterfaceInteger >	   dataNibblesInterface;
 	std::unique_ptr< AnalyzerSettingInterfaceBool >		   spcInterface;
 	std::unique_ptr< AnalyzerSettingInterfaceBool >        legacyCRCInterface;
+	std::unique_ptr< AnalyzerSettingInterfaceBool >        includeStatusInCRCInterface;
+
 	std::unique_ptr< AnalyzerSettingInterfaceNumberList >  SCGenerationInterface;
 };
 

@@ -54,6 +54,11 @@ U8 SENTAnalyzer::CalculateCRC()
 
 	/* Skip the first 2 nibbles if there's only sync and status, skip 3 if there's also a master trigger pulse. */
 	U8 skip = (mSettings->spc) ? 3 : 2;
+	
+	// If we're manuallly specifying to try including the status nibble in the CRC, skip one less nibble.
+	if (mSettings->includeStatusInCRC)
+		skip -= 1;
+
 	for(std::vector<Frame>::iterator it = framelist.begin() + skip; it != framelist.end() - ((mSettings->pausePulseEnabled) ? 2 : 1)/*(number_of_nibbles - crc_nibble_number)*/; it++)
 	{
 		CheckSum16 = it->mData1 ^ crc4_table[CheckSum16];

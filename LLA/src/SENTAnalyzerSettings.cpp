@@ -11,6 +11,7 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	spc(false),
 	legacyCRC(false),
 	numberOfDataNibbles(6),
+	includeStatusInCRC(false),
 	SCGeneration(SCGenerationOptions::Short)
 {
 	mInputChannelInterface.reset( new AnalyzerSettingInterfaceChannel() );
@@ -41,12 +42,17 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	legacyCRCInterface->SetTitleAndTooltip( "Legacy CRC", "Specify whether the legacy crc calculation should be used or not" );
 	legacyCRCInterface->SetValue(legacyCRC);
 
+	includeStatusInCRCInterface.reset( new AnalyzerSettingInterfaceBool() );
+	includeStatusInCRCInterface->SetTitleAndTooltip( "Include Status in CRC", "Specify whether to include the status nibble in CRC validation" );
+	includeStatusInCRCInterface->SetValue(includeStatusInCRC);
+
 	AddInterface( mInputChannelInterface.get() );
 	AddInterface( tickTimeInterface.get() );
 	AddInterface( dataNibblesInterface.get() );
 	AddInterface( spcInterface.get() );
 	AddInterface( pausePulseInterface.get() );
 	AddInterface( legacyCRCInterface.get() );
+	AddInterface( includeStatusInCRCInterface.get() );
 
 	// Generation tools //
 	#ifdef GENERATION_TOOLS
@@ -91,6 +97,7 @@ bool SENTAnalyzerSettings::SetSettingsFromInterfaces()
 
 	numberOfDataNibbles = dataNibblesInterface->GetInteger();
 	legacyCRC = legacyCRCInterface->GetValue();
+	includeStatusInCRC = includeStatusInCRCInterface->GetValue();
 
 	#ifdef GENERATION_TOOLS
 	SCGeneration = (SCGenerationOptions)SCGenerationInterface->GetNumber();
@@ -114,6 +121,7 @@ void SENTAnalyzerSettings::UpdateInterfacesFromSettings()
 	legacyCRCInterface->SetValue(spc);
 	pausePulseInterface->SetValue(pausePulseEnabled);
 	legacyCRCInterface->SetValue(legacyCRC);
+	includeStatusInCRCInterface->SetValue(includeStatusInCRC);
 }
 
 void SENTAnalyzerSettings::LoadSettings( const char* settings )
@@ -127,6 +135,7 @@ void SENTAnalyzerSettings::LoadSettings( const char* settings )
 	text_archive >> spc;
 	text_archive >> pausePulseEnabled;
 	text_archive >> legacyCRC;
+	text_archive >> includeStatusInCRC;
 
 	ClearChannels();
 	AddChannel( mInputChannel, "SENT (SAE J2716)", true );
@@ -144,6 +153,7 @@ const char* SENTAnalyzerSettings::SaveSettings()
 	text_archive << spc;
 	text_archive << pausePulseEnabled;
 	text_archive << legacyCRC;
+	text_archive << includeStatusInCRC;
 
 	return SetReturnString( text_archive.GetString() );
 }
