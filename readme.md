@@ -187,3 +187,11 @@ At the moment, the output format looks like this:
 
 Note that more formats will likely be added, as the format shown above does not allow for the fastest data processing. We will likely add a format that groups the
 for a single SENT frame on a single line (with a timestamp for the beginning of the SENT message)
+
+## CI/CD:
+This repo is currently using CircleCI for continuous delivery of commits pushed to main as Github releases.
+
+For our CI script to be able to push a release to Github, it needs to use a personal access token with permissions to control the repo.
+
+Do this from {your CircleCI project} -> Project Settings -> Environment Variables. 
+Add a new environment variable with the name `GITHUB_API_KEY`, and assign its value to your new personal access token.
