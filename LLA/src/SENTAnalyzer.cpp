@@ -165,9 +165,13 @@ void SENTAnalyzer::beginPulseDetected()
 {
 	if( framelist.size() == number_of_nibbles )
 	{
-		U8 calculated_crc = CalculateCRC();
-		U8 read_crc = framelist.at(crc_nibble_number).mData1;
-		bool crc_correct = read_crc == calculated_crc;
+          U8 read_crc = framelist.at(crc_nibble_number).mData1;
+          U8 calculated_crc = read_crc;
+          bool crc_correct = true;
+          if(!mSettings->ignoreCRC){
+		     U8 calculated_crc = CalculateCRC();
+		     crc_correct = read_crc == calculated_crc;
+          }
 		for(std::vector<Frame>::iterator it = framelist.begin(); it != framelist.end(); it++) {
 			if(!crc_correct && (it->mType == CRCNibble)) {
 				addErrorFrame(read_crc, calculated_crc, it->mStartingSampleInclusive, it->mEndingSampleInclusive, CrcError);
