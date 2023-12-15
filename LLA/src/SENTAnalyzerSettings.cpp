@@ -9,6 +9,7 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	tick_time_us(3),
 	pausePulseEnabled(true),
 	spc(false),
+     ignoreCRC(false),
 	legacyCRC(false),
 	numberOfDataNibbles(6),
 	SCGeneration(SCGenerationOptions::Short)
@@ -37,6 +38,10 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	pausePulseInterface->SetTitleAndTooltip( "Pause pulse", "Specify whether pause pulse is enabled or not" );
 	pausePulseInterface->SetValue(pausePulseEnabled);
 
+	ignoreCRCInterface.reset( new AnalyzerSettingInterfaceBool() );
+	ignoreCRCInterface->SetTitleAndTooltip( "Ignore CRC", "Specify whether the crc should be done or not" );
+	ignoreCRCInterface->SetValue(ignoreCRC);
+
 	legacyCRCInterface.reset( new AnalyzerSettingInterfaceBool() );
 	legacyCRCInterface->SetTitleAndTooltip( "Legacy CRC", "Specify whether the legacy crc calculation should be used or not" );
 	legacyCRCInterface->SetValue(legacyCRC);
@@ -46,6 +51,7 @@ SENTAnalyzerSettings::SENTAnalyzerSettings()
 	AddInterface( dataNibblesInterface.get() );
 	AddInterface( spcInterface.get() );
 	AddInterface( pausePulseInterface.get() );
+     AddInterface( ignoreCRCInterface.get() );
 	AddInterface( legacyCRCInterface.get() );
 
 	// Generation tools //
@@ -91,6 +97,7 @@ bool SENTAnalyzerSettings::SetSettingsFromInterfaces()
 
 	numberOfDataNibbles = dataNibblesInterface->GetInteger();
 	legacyCRC = legacyCRCInterface->GetValue();
+     ignoreCRC = ignoreCRCInterface->GetValue();
 
 	#ifdef GENERATION_TOOLS
 	SCGeneration = (SCGenerationOptions)SCGenerationInterface->GetNumber();
@@ -114,6 +121,7 @@ void SENTAnalyzerSettings::UpdateInterfacesFromSettings()
 	legacyCRCInterface->SetValue(spc);
 	pausePulseInterface->SetValue(pausePulseEnabled);
 	legacyCRCInterface->SetValue(legacyCRC);
+     ignoreCRCInterface->SetValue(ignoreCRC);
 }
 
 void SENTAnalyzerSettings::LoadSettings( const char* settings )
